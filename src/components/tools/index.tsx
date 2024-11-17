@@ -13,7 +13,7 @@ import { useTool } from '@/store/useTool';
 export default function Tools() {
   const { tool, setTool } = useTool();
   return (
-    <Center position="absolute" width="100%" top="4">
+    <Center position="absolute" width="100%" top="4" zIndex="1">
       <Box
         borderRadius="lg"
         shadow="sm"

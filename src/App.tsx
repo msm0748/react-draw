@@ -2,6 +2,7 @@ import { Box } from '@chakra-ui/react';
 import Tools from './components/tools';
 import { useEffect, useState } from 'react';
 import { useTool } from './store/useTool';
+import Canvas from './components/canvas';
 
 function App() {
   const [cursor, setCursor] = useState('default');
@@ -34,8 +35,9 @@ function App() {
     }
   }, [tool]);
   return (
-    <Box width="dvw" height="dvh" style={{ cursor }}>
+    <Box width="dvw" height="dvh" style={{ cursor }} position="relative">
       <Tools />
+      <Canvas />
     </Box>
   );
 }

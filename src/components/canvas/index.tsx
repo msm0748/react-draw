@@ -1,161 +1,137 @@
-import { Stage, Layer, Line, Transformer } from 'react-konva';
-import { useState, useRef } from 'react';
+import { Box } from '@chakra-ui/react';
+import React, { useState, useRef } from 'react';
+import { Stage, Layer, Line } from 'react-konva';
 
-function Canvas() {
-  const [lines, setLines] = useState([]);
+const DrawingApp: React.FC = () => {
+  const [lines, setLines] = useState<
+    Array<{ points: number[]; color: string }>
+  >([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [strokeWidth, setStrokeWidth] = useState(2);
-  const [strokeColor, setStrokeColor] = useState('#000000');
-  const [selectedId, setSelectedId] = useState(null);
-  const [mode, setMode] = useState('draw'); // 'draw' or 'select'
-  const transformerRef = useRef();
+  const stageRef = useRef<any>(null); // Stage 참조
 
-  const handleMouseDown = (e) => {
-    if (mode === 'select') return;
+  const getRelativePointerPosition = (stage: any) => {
+    const transform = stage.getAbsoluteTransform().copy();
+    transform.invert();
+    const pointer = stage.getPointerPosition();
+    return transform.point(pointer);
+  };
 
+  const handleMouseDown = (event: any) => {
+    event.evt.preventDefault(); // 기본 동작 방지
     setIsDrawing(true);
-    const pos = e.target.getStage().getPointerPosition();
-    setLines([
-      ...lines,
-      {
-        id: `line_${Date.now()}`, // 각 선에 고유 ID 추가
-        points: [pos.x, pos.y],
-        color: strokeColor,
-        width: strokeWidth,
-      },
-    ]);
+    const stage = stageRef.current;
+    const pointerPosition = getRelativePointerPosition(stage);
+
+    if (pointerPosition) {
+      setLines([
+        ...lines,
+        { points: [pointerPosition.x, pointerPosition.y], color: 'black' },
+      ]);
+    }
   };
 
-  const handleMouseMove = (e) => {
-    if (!isDrawing || mode === 'select') return;
+  const handleMouseMove = (event: any) => {
+    event.evt.preventDefault(); // 기본 동작 방지
+    if (!isDrawing) return;
 
-    const stage = e.target.getStage();
-    const point = stage.getPointerPosition();
+    const stage = stageRef.current;
+    const pointerPosition = getRelativePointerPosition(stage);
 
-    const lastLine = lines[lines.length - 1];
-    lastLine.points = lastLine.points.concat([point.x, point.y]);
-
-    lines.splice(lines.length - 1, 1, lastLine);
-    setLines([...lines]);
+    if (pointerPosition) {
+      const updatedLines = [...lines];
+      const lastLine = updatedLines[updatedLines.length - 1];
+      lastLine.points = lastLine.points.concat([
+        pointerPosition.x,
+        pointerPosition.y,
+      ]);
+      setLines(updatedLines);
+    }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (event: any) => {
+    event.evt.preventDefault(); // 기본 동작 방지
     setIsDrawing(false);
   };
 
-  // 선택 처리
-  const handleSelect = (lineId) => {
-    if (mode !== 'select') return;
-    setSelectedId(lineId);
+  const handleWheel = (event: any) => {
+    event.evt.preventDefault();
+
+    const stage = stageRef.current;
+    const scaleBy = 1.1; // 확대/축소 비율
+    const oldScale = stage.scaleX();
+
+    // 마우스 위치 기반으로 새로운 스케일 계산
+    const pointer = stage.getPointerPosition();
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
+    };
+
+    const newScale = Math.max(
+      0.5,
+      Math.min(
+        5,
+        event.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
+      )
+    );
+
+    stage.scale({ x: newScale, y: newScale });
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    };
+
+    stage.position(newPos);
+    stage.batchDraw();
   };
 
-  // 선택 해제
-  const handleDeselect = (e) => {
-    if (e.target === e.target.getStage()) {
-      setSelectedId(null);
-    }
+  const handleTouchStart = (event: any) => {
+    event.evt.preventDefault();
+    handleMouseDown(event);
   };
 
-  const handleUndo = () => {
-    setLines(lines.slice(0, -1));
-    setSelectedId(null);
+  const handleTouchMove = (event: any) => {
+    event.evt.preventDefault();
+    handleMouseMove(event);
   };
 
-  const handleClear = () => {
-    setLines([]);
-    setSelectedId(null);
-  };
-
-  // 선택된 선 삭제
-  const handleDelete = () => {
-    if (selectedId) {
-      setLines(lines.filter((line) => line.id !== selectedId));
-      setSelectedId(null);
-    }
+  const handleTouchEnd = (event: any) => {
+    event.evt.preventDefault();
+    handleMouseUp(event);
   };
 
   return (
-    <div>
-      <div style={{ marginBottom: 10 }}>
-        <button
-          onClick={() => {
-            setMode('draw');
-            setSelectedId(null);
-          }}
-          style={{ backgroundColor: mode === 'draw' ? '#ddd' : 'white' }}
-        >
-          그리기 모드
-        </button>
-        <button
-          onClick={() => setMode('select')}
-          style={{ backgroundColor: mode === 'select' ? '#ddd' : 'white' }}
-        >
-          선택 모드
-        </button>
-        <input
-          type="color"
-          value={strokeColor}
-          onChange={(e) => setStrokeColor(e.target.value)}
-        />
-        <input
-          type="range"
-          min={1}
-          max={20}
-          value={strokeWidth}
-          onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
-        />
-        <button onClick={handleUndo}>실행 취소</button>
-        <button onClick={handleClear}>전체 지우기</button>
-        {mode === 'select' && <button onClick={handleDelete}>선택 삭제</button>}
-      </div>
-
+    <Box position="absolute" top="0" left="0" width="full" height="full">
       <Stage
         width={window.innerWidth}
         height={window.innerHeight}
         onMouseDown={handleMouseDown}
-        onMousemove={handleMouseMove}
-        onMouseup={handleMouseUp}
-        onTouchStart={handleMouseDown}
-        onTouchMove={handleMouseMove}
-        onTouchEnd={handleMouseUp}
-        onClick={handleDeselect}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        ref={stageRef}
+        // draggable // 드래그로 이동 가능
       >
         <Layer>
-          {lines.map((line) => (
+          {lines.map((line, index) => (
             <Line
-              key={line.id}
-              id={line.id}
+              key={index}
               points={line.points}
               stroke={line.color}
-              strokeWidth={line.width}
+              strokeWidth={1}
               tension={0.5}
               lineCap="round"
               lineJoin="round"
-              globalCompositeOperation="source-over"
-              onClick={() => handleSelect(line.id)}
-              onTap={() => handleSelect(line.id)}
-              draggable={mode === 'select'}
-              // 선택된 선 강조
-              strokeScaleEnabled={false}
-              hitStrokeWidth={line.id === selectedId ? 20 : 10}
             />
           ))}
-          {/* 선택된 선에 대한 Transformer */}
-          {selectedId && mode === 'select' && (
-            <Transformer
-              ref={transformerRef}
-              boundBoxFunc={(oldBox, newBox) => {
-                // 크기 조절 제한을 추가할 수 있습니다
-                return newBox;
-              }}
-              rotateEnabled={false}
-              flipEnabled={false}
-            />
-          )}
         </Layer>
       </Stage>
-    </div>
+    </Box>
   );
-}
+};
 
-export default Canvas;
+export default DrawingApp;
